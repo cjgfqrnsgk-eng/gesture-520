@@ -51,7 +51,7 @@ let appState = STATE.LOADING;
 let sequenceProgress = 0; // 0=等5, 1=等2, 2=等0, 3=完成
 let gestureStableMs = 0;
 let lastFingerCount = -1;
-const GESTURE_HOLD_MS = 1000; // 手势稳定1秒确认
+const GESTURE_HOLD_MS = 600; // 手势稳定0.6秒确认
 const TARGET_SEQUENCE = [5, 2, 0];
 
 // 照片
@@ -87,35 +87,32 @@ hands.onResults((results) => {
   }
 });
 
-// 手指计数：通过 MediaPipe 手部 21 个关键点判断手指是否伸展
-// 关键点索引：
-//   拇指: 4(tip), 3(ip), 2(mcp)
-//   食指: 8(tip), 7(dip), 6(pip), 5(mcp)
-//   中指: 12(tip), 11(dip), 10(pip), 9(mcp)
-//   无名指: 16(tip), 15(dip), 14(pip), 13(mcp)
-//   小指: 20(tip), 19(dip), 18(pip), 17(mcp)
-//   手腕: 0
+// 手指计数：比较指尖到指根距离 vs 指中关节到指根距离
+// 伸展时指尖距指根远，弯曲时指尖距指根近
+// 使用欧几里得距离，不受手掌旋转方向影响
 //
-// 判断逻辑：
-//   拇指：比较 tip(4) 与 mcp(2) 的水平距离（拇指运动主要在 x 轴）
-//   其余四指：tip.y < pip.y 说明指尖在指根上方，即伸展
+// MediaPipe 关键点索引：
+//   拇指: 4(tip), 3(ip), 2(mcp)
+//   食指: 8(tip), 6(pip), 5(mcp)
+//   中指: 12(tip), 10(pip), 9(mcp)
+//   无名指: 16(tip), 14(pip), 13(mcp)
+//   小指: 20(tip), 18(pip), 17(mcp)
 function countFingers(landmarks) {
+  const fingers = [
+    [4, 2, 3],   // 拇指: tip, mcp, ip
+    [8, 5, 6],   // 食指: tip, mcp, pip
+    [12, 9, 10], // 中指: tip, mcp, pip
+    [16, 13, 14],// 无名指: tip, mcp, pip
+    [20, 17, 18],// 小指: tip, mcp, pip
+  ];
+
   let count = 0;
-
-  // 拇指：tip(4) 与 mcp(2) 的水平距离
-  if (Math.abs(landmarks[4].x - landmarks[2].x) > 0.05) count++;
-
-  // 食指：tip(8) y < pip(6) y
-  if (landmarks[8].y < landmarks[6].y) count++;
-
-  // 中指：tip(12) y < pip(10) y
-  if (landmarks[12].y < landmarks[10].y) count++;
-
-  // 无名指：tip(16) y < pip(14) y
-  if (landmarks[16].y < landmarks[14].y) count++;
-
-  // 小指：tip(20) y < pip(18) y
-  if (landmarks[20].y < landmarks[18].y) count++;
+  for (const [tip, mcp, pip] of fingers) {
+    const tipDist = Math.hypot(landmarks[tip].x - landmarks[mcp].x, landmarks[tip].y - landmarks[mcp].y);
+    const pipDist = Math.hypot(landmarks[pip].x - landmarks[mcp].x, landmarks[pip].y - landmarks[mcp].y);
+    // 伸展时指尖到指根的距离明显大于指中关节到指根的距离
+    if (tipDist > pipDist * 1.15) count++;
+  }
 
   return count;
 }
@@ -453,12 +450,41 @@ function draw() {
     drawParticles();
   } else if (appState === STATE.WAITING) {
     drawParticles();
+    // 手势匹配时粒子变亮作为即时反应
+    if (currentFingerCount === TARGET_SEQUENCE[sequenceProgress]) {
+      ctx.save();
+      ctx.globalAlpha = 0.06;
+      ctx.fillStyle = '#ffd700';
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
     drawRipples();
   } else if (appState === STATE.REVEALING) {
     drawParticles();
     drawRipples();
     drawPhotoReveal();
   }
+  if (DEBUG) drawDebug();
+}
+
+// 调试模式：URL 加 ?debug=1 显示识别到的手指数量
+const DEBUG = new URLSearchParams(window.location.search).has('debug');
+
+function drawDebug() {
+  const info = [
+    'state: ' + appState,
+    'fingers: ' + currentFingerCount,
+    'progress: ' + sequenceProgress + '/3 (target: ' + (TARGET_SEQUENCE[sequenceProgress] ?? 'done') + ')',
+    'stable: ' + (gestureStableMs / 1000).toFixed(1) + 's',
+    'brightness: ' + particleBrightness.toFixed(2),
+  ];
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect(8, 8, 200, info.length * 18 + 12);
+  ctx.fillStyle = '#0f0';
+  ctx.font = '13px monospace';
+  info.forEach((line, i) => ctx.fillText(line, 16, 26 + i * 18));
+  ctx.restore();
 }
 
 // 先启动渲染循环（显示加载动画）
