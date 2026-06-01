@@ -63,31 +63,39 @@ const GLOW_MAX_RADIUS_FACTOR = 0.45;
 const REVEAL_DURATION = 2.5; // 浮现动画总时长（秒）
 
 // 摄像头和 MediaPipe
+let currentFingerCount = -1;
 const videoEl = document.getElementById('video');
 
-const hands = new Hands({
-  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-});
+function initMediaPipe() {
+  try {
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
 
-hands.setOptions({
-  maxNumHands: 1,
-  modelComplexity: 1,
-  minDetectionConfidence: 0.5,
-  minTrackingConfidence: 0.3,
-});
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.3,
+    });
 
-let currentFingerCount = -1; // -1 表示未检测到手
+    hands.onResults((results) => {
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const lm = results.multiHandLandmarks[0];
+        currentFingerCount = countFingers(lm);
+        debugStatus = 'tracking';
+      } else {
+        currentFingerCount = -1;
+        debugStatus = 'waiting-hand';
+      }
+    });
 
-hands.onResults((results) => {
-  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    const lm = results.multiHandLandmarks[0];
-    currentFingerCount = countFingers(lm);
-    debugStatus = 'tracking';
-  } else {
-    currentFingerCount = -1;
-    debugStatus = 'waiting-hand';
+    return hands;
+  } catch (err) {
+    debugStatus = 'MediaPipe-ERR: ' + err.message;
+    return null;
   }
-});
+}
 
 // 手指计数：比较指尖到指根距离 vs 指中关节到指根距离
 // 伸展时指尖距指根远，弯曲时指尖距指根近
@@ -129,13 +137,16 @@ async function startCamera() {
     await videoEl.play();
     debugStatus = 'camera-ok';
 
+    const hands = initMediaPipe();
+    if (!hands) return; // 初始化失败，错误已在 debugStatus 中
+
+    debugStatus = 'model-loading';
     const camera = new Camera(videoEl, {
       onFrame: async () => { await hands.send({ image: videoEl }); },
       width: 640,
       height: 480,
     });
     camera.start();
-    debugStatus = 'model-loading';
 
     // 加载完成，切换到等待状态
     appState = STATE.WAITING;
