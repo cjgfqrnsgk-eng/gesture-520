@@ -111,22 +111,26 @@ function initMediaPipe() {
 //   中指: 12(tip), 10(pip), 9(mcp)
 //   无名指: 16(tip), 14(pip), 13(mcp)
 //   小指: 20(tip), 18(pip), 17(mcp)
+let fingerDetail = '';
 function countFingers(landmarks) {
   const fingers = [
-    [4, 2, 3],   // 拇指: tip, mcp, ip
-    [8, 5, 6],   // 食指: tip, mcp, pip
-    [12, 9, 10], // 中指: tip, mcp, pip
-    [16, 13, 14],// 无名指: tip, mcp, pip
-    [20, 17, 18],// 小指: tip, mcp, pip
+    [4, 3, 2, 'T'],   // 拇指: tip, ip, mcp
+    [8, 6, 5, 'I'],   // 食指: tip, pip, mcp
+    [12, 10, 9, 'M'], // 中指: tip, pip, mcp
+    [16, 14, 13, 'R'],// 无名指: tip, pip, mcp
+    [20, 18, 17, 'P'],// 小指: tip, pip, mcp
   ];
 
   let count = 0;
-  for (const [tip, mcp, pip] of fingers) {
+  const bits = [];
+  for (const [tip, pip, mcp, label] of fingers) {
     const tipDist = Math.hypot(landmarks[tip].x - landmarks[mcp].x, landmarks[tip].y - landmarks[mcp].y);
     const pipDist = Math.hypot(landmarks[pip].x - landmarks[mcp].x, landmarks[pip].y - landmarks[mcp].y);
-    // 伸展时指尖到指根的距离明显大于指中关节到指根的距离
-    if (tipDist > pipDist * 1.15) count++;
+    const extended = tipDist > pipDist * 1.1;
+    if (extended) count++;
+    bits.push(label + ':' + (extended ? '1' : '0'));
   }
+  fingerDetail = bits.join(' ');
 
   return count;
 }
@@ -505,11 +509,10 @@ function drawDebug() {
   if (!el) return;
   el.innerHTML = [
     'status: ' + debugStatus,
-    'state: ' + appState,
-    'fingers: ' + currentFingerCount + ' (t:' + (TARGET_SEQUENCE[sequenceProgress] ?? '-') + ')',
-    'seq: ' + sequenceProgress + '/3  stable:' + (gestureStableMs / 1000).toFixed(1) + 's',
-    'frames: ' + frameCount + '  results: ' + resultCount,
-    'video: ' + (videoEl.readyState >= 2 ? 'playing' : 's=' + videoEl.readyState),
+    'fingers: ' + currentFingerCount + ' t:' + (TARGET_SEQUENCE[sequenceProgress] ?? '-'),
+    'detail: ' + fingerDetail,
+    'seq: ' + sequenceProgress + '/3  s:' + (gestureStableMs / 1000).toFixed(1),
+    'f:' + frameCount + ' r:' + resultCount + ' v:' + (videoEl.readyState >= 2 ? 'play' : videoEl.readyState),
   ].join('<br>');
 }
 
