@@ -263,6 +263,7 @@ function triggerGesture(fingerCount) {
     // 全部完成，延迟后进入浮现状态
     setTimeout(() => {
       appState = STATE.REVEALING;
+      playBirthdaySong();
     }, 800);
   }
 }
@@ -412,6 +413,82 @@ function drawParticles() {
   }
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
+}
+
+// 生日歌（Web Audio API 合成，音乐盒音色）
+let audioCtx = null;
+function playBirthdaySong() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const t = audioCtx.currentTime;
+    const gain = audioCtx.createGain();
+    gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0.3, t);
+
+    // 音符频率
+    const C4 = 261.63, D4 = 293.66, E4 = 329.63, F4 = 349.23;
+    const G4 = 392.00, A4 = 440.00, Bb4 = 466.16, C5 = 523.25;
+
+    // 音乐盒音色：正弦波 + 少量高次谐波
+    function note(freq, start, dur) {
+      const osc = audioCtx.createOscillator();
+      const noteGain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      // 加一点泛音
+      const osc2 = audioCtx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(freq * 2, start);
+      const noteGain2 = audioCtx.createGain();
+      noteGain2.gain.setValueAtTime(0.1, start);
+      noteGain2.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      osc2.connect(noteGain2);
+      noteGain2.connect(gain);
+
+      noteGain.gain.setValueAtTime(0.5, start);
+      noteGain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      osc.connect(noteGain);
+      noteGain.connect(gain);
+      osc.start(start);
+      osc.stop(start + dur);
+      osc2.start(start);
+      osc2.stop(start + dur);
+    }
+
+    const b = 0.22; // 一拍时长（秒）
+    let p = 0;
+    // 祝你生日快乐
+    note(C4, t + p, b * 1.5); p += b * 2;
+    note(C4, t + p, b * 0.5); p += b;
+    note(D4, t + p, b * 2); p += b * 2;
+    note(C4, t + p, b * 2); p += b * 2;
+    note(F4, t + p, b * 2); p += b * 2;
+    note(E4, t + p, b * 4); p += b * 4;
+    // 祝你生日快乐
+    note(C4, t + p, b * 1.5); p += b * 2;
+    note(C4, t + p, b * 0.5); p += b;
+    note(D4, t + p, b * 2); p += b * 2;
+    note(C4, t + p, b * 2); p += b * 2;
+    note(G4, t + p, b * 2); p += b * 2;
+    note(F4, t + p, b * 4); p += b * 4;
+    // 祝你生日快乐
+    note(C4, t + p, b * 1.5); p += b * 2;
+    note(C4, t + p, b * 0.5); p += b;
+    note(C5, t + p, b * 2); p += b * 2;
+    note(A4, t + p, b * 2); p += b * 2;
+    note(F4, t + p, b * 2); p += b * 2;
+    note(E4, t + p, b * 2); p += b * 2;
+    note(D4, t + p, b * 4); p += b * 4;
+    // 祝你生日快乐
+    note(Bb4, t + p, b * 1.5); p += b * 2;
+    note(Bb4, t + p, b * 0.5); p += b;
+    note(A4, t + p, b * 2); p += b * 2;
+    note(F4, t + p, b * 2); p += b * 2;
+    note(G4, t + p, b * 2); p += b * 2;
+    note(F4, t + p, b * 4); p += b * 4;
+  } catch (e) {
+    console.error('Audio failed:', e);
+  }
 }
 
 // 照片浮现
