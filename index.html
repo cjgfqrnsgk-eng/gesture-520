@@ -141,19 +141,16 @@ async function startCamera() {
     debugStatus = 'camera-ok';
 
     const hands = initMediaPipe();
-    if (!hands) return; // 初始化失败，错误已在 debugStatus 中
+    if (!hands) return;
 
     debugStatus = 'model-loading';
-    const camera = new Camera(videoEl, {
-      onFrame: async () => { frameCount++; await hands.send({ image: videoEl }); },
-      width: 640,
-      height: 480,
-    });
-    camera.start();
+    // 等待模型预热（hands.send 首次调用会触发模型下载）
+    await hands.send({ image: videoEl });
 
-    // 加载完成，切换到等待状态
-    appState = STATE.WAITING;
+    // 不用 Camera 工具类，自己在渲染循环中喂帧
+    window._hands = hands;
     debugStatus = 'ready';
+    appState = STATE.WAITING;
   } catch (err) {
     debugStatus = 'ERROR: ' + (err.message || err);
     console.error('Camera/MediaPipe init failed:', err);
@@ -276,6 +273,12 @@ function updateRipples(dt) {
 }
 
 function update(dt) {
+  // 手动喂帧给 MediaPipe（不用 Camera 工具类）
+  if (window._hands && videoEl.readyState >= 2 && appState !== STATE.REVEALING) {
+    frameCount++;
+    window._hands.send({ image: videoEl });
+  }
+
   if (appState === STATE.WAITING) {
     updateParticles(dt);
 
@@ -507,10 +510,10 @@ function drawDebug() {
   ];
   ctx.save();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(6, 6, 220, info.length * 15 + 12);
+  ctx.fillRect(6, 6, 240, info.length * 15 + 12);
   ctx.fillStyle = '#0f0';
-  ctx.font = '11px monospace';
-  info.forEach((line, i) => ctx.fillText(line, 12, 20 + i * 15));
+  ctx.font = '10px monospace';
+  info.forEach((line, i) => ctx.fillText(line, 10, 18 + i * 15));
   ctx.restore();
 }
 
