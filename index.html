@@ -67,6 +67,8 @@ const REVEAL_DURATION = 2.5; // 浮现动画总时长（秒）
 let currentFingerCount = -1;
 let frameCount = 0;
 let resultCount = 0;
+let handCount = 0;
+let lastHandFrame = -1;
 const videoEl = document.getElementById('video');
 
 function initMediaPipe() {
@@ -78,13 +80,15 @@ function initMediaPipe() {
     hands.setOptions({
       maxNumHands: 1,
       modelComplexity: 1,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.3,
+      minDetectionConfidence: 0.3,
+      minTrackingConfidence: 0.1,
     });
 
     hands.onResults((results) => {
       resultCount++;
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        handCount++;
+        lastHandFrame = resultCount;
         const lm = results.multiHandLandmarks[0];
         currentFingerCount = countFingers(lm);
         debugStatus = 'tracking';
@@ -139,7 +143,7 @@ async function startCamera() {
   try {
     debugStatus = 'camera-req';
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
     });
     videoEl.srcObject = stream;
     await videoEl.play();
@@ -509,11 +513,11 @@ function drawDebug() {
   const el = document.getElementById('debug');
   if (!el) return;
   el.innerHTML = [
-    'status: ' + debugStatus,
-    'fingers: ' + currentFingerCount + ' rel:' + (needRelease ? '1' : '0'),
+    'status: ' + debugStatus + '  seq:' + sequenceProgress + '/3',
+    'fingers: ' + currentFingerCount + '  rel:' + (needRelease ? '1' : '0'),
     'detail: ' + fingerDetail,
-    'seq: ' + sequenceProgress + '/3  s:' + (gestureStableMs / 1000).toFixed(1),
-    'f:' + frameCount + ' r:' + resultCount + ' v:' + (videoEl.readyState >= 2 ? 'play' : videoEl.readyState),
+    'f:' + frameCount + ' r:' + resultCount + ' h:' + handCount + ' lh:' + lastHandFrame,
+    'stable: ' + (gestureStableMs / 1000).toFixed(1) + 's',
   ].join('<br>');
 }
 
