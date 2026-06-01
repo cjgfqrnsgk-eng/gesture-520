@@ -53,7 +53,7 @@ let sequenceProgress = 0; // 0=等5, 1=等2, 2=等0, 3=完成
 let gestureStableMs = 0;
 let lastFingerCount = -1;
 const GESTURE_HOLD_MS = 600; // 手势稳定0.6秒确认
-const TARGET_SEQUENCE = [5, 2, 0];
+let needRelease = false; // 每次确认后需先放下手
 
 // 照片
 const photo = new Image();
@@ -287,18 +287,19 @@ function update(dt) {
   if (appState === STATE.WAITING) {
     updateParticles(dt);
 
-    const targetFingers = TARGET_SEQUENCE[sequenceProgress];
+    // 任何手势都算，只需检测到手
+    const handDetected = currentFingerCount >= 0;
 
-    if (currentFingerCount === targetFingers) {
+    if (handDetected && !needRelease) {
       gestureStableMs += dt * 1000;
       if (gestureStableMs >= GESTURE_HOLD_MS) {
-        // 手势确认！
-        triggerGesture(targetFingers);
+        triggerGesture(currentFingerCount);
         gestureStableMs = 0;
+        needRelease = true; // 必须先放下手才能触发下一次
       }
-    } else {
-      // 手势不匹配或没检测到手，重置计时
+    } else if (!handDetected) {
       gestureStableMs = 0;
+      needRelease = false; // 手放下了，允许下次触发
     }
   } else if (appState === STATE.REVEALING) {
     updateParticlesReveal(dt);
@@ -509,7 +510,7 @@ function drawDebug() {
   if (!el) return;
   el.innerHTML = [
     'status: ' + debugStatus,
-    'fingers: ' + currentFingerCount + ' t:' + (TARGET_SEQUENCE[sequenceProgress] ?? '-'),
+    'fingers: ' + currentFingerCount + ' rel:' + (needRelease ? '1' : '0'),
     'detail: ' + fingerDetail,
     'seq: ' + sequenceProgress + '/3  s:' + (gestureStableMs / 1000).toFixed(1),
     'f:' + frameCount + ' r:' + resultCount + ' v:' + (videoEl.readyState >= 2 ? 'play' : videoEl.readyState),
