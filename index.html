@@ -16,7 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
-<div id="debug" style="position:fixed;top:4px;left:4px;z-index:999;background:rgba(0,0,0,0.75);color:#0f0;font:10px/16px monospace;padding:8px;border-radius:4px;pointer-events:none;max-width:250px"></div>
+<div id="debug" style="display:none;position:fixed;top:4px;left:4px;z-index:999;background:rgba(0,0,0,0.75);color:#0f0;font:10px/16px monospace;padding:8px;border-radius:4px;pointer-events:none;max-width:250px"></div>
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
 <script>
@@ -479,6 +479,18 @@ function drawPhotoReveal() {
 
     ctx.drawImage(photo, px, py, drawW, drawH);
     ctx.restore();
+
+    // 生日祝福文字（照片下方）
+    const textY = py + drawH + 36;
+    ctx.save();
+    ctx.globalAlpha = photoFadeProgress;
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 18px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(255, 200, 50, 0.6)';
+    ctx.shadowBlur = 8;
+    ctx.fillText('生日快乐，我的宝贝！', cx, textY);
+    ctx.restore();
   }
 }
 
@@ -488,8 +500,8 @@ function draw() {
     drawParticles();
   } else if (appState === STATE.WAITING) {
     drawParticles();
-    // 手势匹配时：明显的金色光晕脉冲
-    if (currentFingerCount === TARGET_SEQUENCE[sequenceProgress] && currentFingerCount >= 0) {
+    // 检测到手时：金色光晕脉冲
+    if (currentFingerCount >= 0 && !needRelease) {
       const pulse = 0.08 + Math.sin(totalTime * 4) * 0.03;
       ctx.save();
       ctx.globalAlpha = pulse;
@@ -503,11 +515,14 @@ function draw() {
     drawRipples();
     drawPhotoReveal();
   }
-  // 始终显示调试信息
-  drawDebug();
+  // 调试信息：URL 加 ?debug=1 才显示
+  if (DEBUG) drawDebug();
 }
 
 // 调试信息（始终显示，正式发布时注释掉 drawDebug() 调用）
+const DEBUG = new URLSearchParams(window.location.search).has('debug');
+if (DEBUG) { const d = document.getElementById('debug'); if (d) d.style.display = ''; }
+
 let debugStatus = 'init';
 function drawDebug() {
   const el = document.getElementById('debug');
