@@ -16,6 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
+<div id="debug" style="position:fixed;top:4px;left:4px;z-index:999;background:rgba(0,0,0,0.75);color:#0f0;font:10px/16px monospace;padding:8px;border-radius:4px;pointer-events:none;max-width:250px"></div>
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
 <script>
@@ -500,21 +501,16 @@ function draw() {
 // 调试信息（始终显示，正式发布时注释掉 drawDebug() 调用）
 let debugStatus = 'init';
 function drawDebug() {
-  const info = [
+  const el = document.getElementById('debug');
+  if (!el) return;
+  el.innerHTML = [
     'status: ' + debugStatus,
     'state: ' + appState,
     'fingers: ' + currentFingerCount + ' (t:' + (TARGET_SEQUENCE[sequenceProgress] ?? '-') + ')',
     'seq: ' + sequenceProgress + '/3  stable:' + (gestureStableMs / 1000).toFixed(1) + 's',
     'frames: ' + frameCount + '  results: ' + resultCount,
-    'video: ' + (videoEl.readyState >= 2 ? 'playing' : 'state=' + videoEl.readyState),
-  ];
-  ctx.save();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(6, 6, 240, info.length * 15 + 12);
-  ctx.fillStyle = '#0f0';
-  ctx.font = '10px monospace';
-  info.forEach((line, i) => ctx.fillText(line, 10, 18 + i * 15));
-  ctx.restore();
+    'video: ' + (videoEl.readyState >= 2 ? 'playing' : 's=' + videoEl.readyState),
+  ].join('<br>');
 }
 
 // 先启动渲染循环（显示加载动画）
