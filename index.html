@@ -72,8 +72,8 @@ const hands = new Hands({
 hands.setOptions({
   maxNumHands: 1,
   modelComplexity: 1,
-  minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.5,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.3,
 });
 
 let currentFingerCount = -1; // -1 表示未检测到手
@@ -82,8 +82,10 @@ hands.onResults((results) => {
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     const lm = results.multiHandLandmarks[0];
     currentFingerCount = countFingers(lm);
+    debugStatus = 'tracking';
   } else {
     currentFingerCount = -1;
+    debugStatus = 'waiting-hand';
   }
 });
 
@@ -118,21 +120,30 @@ function countFingers(landmarks) {
 }
 
 async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
-  });
-  videoEl.srcObject = stream;
-  await videoEl.play();
+  try {
+    debugStatus = 'camera-req';
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+    });
+    videoEl.srcObject = stream;
+    await videoEl.play();
+    debugStatus = 'camera-ok';
 
-  const camera = new Camera(videoEl, {
-    onFrame: async () => { await hands.send({ image: videoEl }); },
-    width: 640,
-    height: 480,
-  });
-  camera.start();
+    const camera = new Camera(videoEl, {
+      onFrame: async () => { await hands.send({ image: videoEl }); },
+      width: 640,
+      height: 480,
+    });
+    camera.start();
+    debugStatus = 'model-loading';
 
-  // 加载完成，切换到等待状态
-  appState = STATE.WAITING;
+    // 加载完成，切换到等待状态
+    appState = STATE.WAITING;
+    debugStatus = 'ready';
+  } catch (err) {
+    debugStatus = 'ERROR: ' + (err.message || err);
+    console.error('Camera/MediaPipe init failed:', err);
+  }
 }
 
 // 时间
@@ -450,10 +461,11 @@ function draw() {
     drawParticles();
   } else if (appState === STATE.WAITING) {
     drawParticles();
-    // 手势匹配时粒子变亮作为即时反应
-    if (currentFingerCount === TARGET_SEQUENCE[sequenceProgress]) {
+    // 手势匹配时：明显的金色光晕脉冲
+    if (currentFingerCount === TARGET_SEQUENCE[sequenceProgress] && currentFingerCount >= 0) {
+      const pulse = 0.08 + Math.sin(totalTime * 4) * 0.03;
       ctx.save();
-      ctx.globalAlpha = 0.06;
+      ctx.globalAlpha = pulse;
       ctx.fillStyle = '#ffd700';
       ctx.fillRect(0, 0, width, height);
       ctx.restore();
@@ -464,26 +476,26 @@ function draw() {
     drawRipples();
     drawPhotoReveal();
   }
-  if (DEBUG) drawDebug();
+  // 始终显示调试信息
+  drawDebug();
 }
 
-// 调试模式：URL 加 ?debug=1 显示识别到的手指数量
-const DEBUG = new URLSearchParams(window.location.search).has('debug');
-
+// 调试信息（始终显示，正式发布时注释掉 drawDebug() 调用）
+let debugStatus = 'init';
 function drawDebug() {
   const info = [
+    'status: ' + debugStatus,
     'state: ' + appState,
-    'fingers: ' + currentFingerCount,
-    'progress: ' + sequenceProgress + '/3 (target: ' + (TARGET_SEQUENCE[sequenceProgress] ?? 'done') + ')',
+    'fingers: ' + currentFingerCount + ' (target:' + (TARGET_SEQUENCE[sequenceProgress] ?? '-') + ')',
+    'seq: ' + sequenceProgress + '/3',
     'stable: ' + (gestureStableMs / 1000).toFixed(1) + 's',
-    'brightness: ' + particleBrightness.toFixed(2),
   ];
   ctx.save();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.fillRect(8, 8, 200, info.length * 18 + 12);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(6, 6, 210, info.length * 15 + 10);
   ctx.fillStyle = '#0f0';
-  ctx.font = '13px monospace';
-  info.forEach((line, i) => ctx.fillText(line, 16, 26 + i * 18));
+  ctx.font = '11px monospace';
+  info.forEach((line, i) => ctx.fillText(line, 12, 20 + i * 15));
   ctx.restore();
 }
 
