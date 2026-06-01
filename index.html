@@ -64,6 +64,8 @@ const REVEAL_DURATION = 2.5; // 浮现动画总时长（秒）
 
 // 摄像头和 MediaPipe
 let currentFingerCount = -1;
+let frameCount = 0;
+let resultCount = 0;
 const videoEl = document.getElementById('video');
 
 function initMediaPipe() {
@@ -80,6 +82,7 @@ function initMediaPipe() {
     });
 
     hands.onResults((results) => {
+      resultCount++;
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const lm = results.multiHandLandmarks[0];
         currentFingerCount = countFingers(lm);
@@ -142,7 +145,7 @@ async function startCamera() {
 
     debugStatus = 'model-loading';
     const camera = new Camera(videoEl, {
-      onFrame: async () => { await hands.send({ image: videoEl }); },
+      onFrame: async () => { frameCount++; await hands.send({ image: videoEl }); },
       width: 640,
       height: 480,
     });
@@ -497,13 +500,14 @@ function drawDebug() {
   const info = [
     'status: ' + debugStatus,
     'state: ' + appState,
-    'fingers: ' + currentFingerCount + ' (target:' + (TARGET_SEQUENCE[sequenceProgress] ?? '-') + ')',
-    'seq: ' + sequenceProgress + '/3',
-    'stable: ' + (gestureStableMs / 1000).toFixed(1) + 's',
+    'fingers: ' + currentFingerCount + ' (t:' + (TARGET_SEQUENCE[sequenceProgress] ?? '-') + ')',
+    'seq: ' + sequenceProgress + '/3  stable:' + (gestureStableMs / 1000).toFixed(1) + 's',
+    'frames: ' + frameCount + '  results: ' + resultCount,
+    'video: ' + (videoEl.readyState >= 2 ? 'playing' : 'state=' + videoEl.readyState),
   ];
   ctx.save();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(6, 6, 210, info.length * 15 + 10);
+  ctx.fillRect(6, 6, 220, info.length * 15 + 12);
   ctx.fillStyle = '#0f0';
   ctx.font = '11px monospace';
   info.forEach((line, i) => ctx.fillText(line, 12, 20 + i * 15));
