@@ -16,7 +16,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
-<div id="debug" style="display:none;position:fixed;top:4px;left:4px;z-index:999;background:rgba(0,0,0,0.75);color:#0f0;font:10px/16px monospace;padding:8px;border-radius:4px;pointer-events:none;max-width:250px"></div>
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
 <script>
@@ -91,16 +90,14 @@ function initMediaPipe() {
         lastHandFrame = resultCount;
         const lm = results.multiHandLandmarks[0];
         currentFingerCount = countFingers(lm);
-        debugStatus = 'tracking';
       } else {
         currentFingerCount = -1;
-        debugStatus = 'waiting-hand';
       }
     });
 
     return hands;
   } catch (err) {
-    debugStatus = 'MediaPipe-ERR: ' + err.message;
+    console.error('MediaPipe init failed:', err);
     return null;
   }
 }
@@ -141,27 +138,19 @@ function countFingers(landmarks) {
 
 async function startCamera() {
   try {
-    debugStatus = 'camera-req';
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
     });
     videoEl.srcObject = stream;
     await videoEl.play();
-    debugStatus = 'camera-ok';
 
     const hands = initMediaPipe();
     if (!hands) return;
 
-    debugStatus = 'model-loading';
-    // 等待模型预热（hands.send 首次调用会触发模型下载）
     await hands.send({ image: videoEl });
-
-    // 不用 Camera 工具类，自己在渲染循环中喂帧
     window._hands = hands;
-    debugStatus = 'ready';
     appState = STATE.WAITING;
   } catch (err) {
-    debugStatus = 'ERROR: ' + (err.message || err);
     console.error('Camera/MediaPipe init failed:', err);
   }
 }
@@ -495,19 +484,19 @@ function drawPhotoReveal() {
 
     ctx.drawImage(photo, px, py, drawW, drawH);
     ctx.restore();
-
-    // 生日祝福文字（照片下方）
-    const textY = py + drawH + 40;
-    ctx.save();
-    ctx.globalAlpha = photoFadeProgress;
-    ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 20px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(255, 200, 50, 0.8)';
-    ctx.shadowBlur = 14;
-    ctx.fillText('生日快乐，我的宝贝！', cx, textY);
-    ctx.restore();
   }
+
+  // 生日祝福文字（无论照片是否加载都显示）
+  const textY = height * 0.85;
+  ctx.save();
+  ctx.globalAlpha = photoFadeProgress;
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 22px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(255, 200, 50, 0.9)';
+  ctx.shadowBlur = 16;
+  ctx.fillText('生日快乐，我的宝贝！', cx, textY);
+  ctx.restore();
 }
 
 function draw() {
@@ -546,26 +535,9 @@ function draw() {
     drawRipples();
     drawPhotoReveal();
   }
-  // 调试信息：URL 加 ?debug=1 才显示
-  if (DEBUG) drawDebug();
 }
 
 // 调试信息（始终显示，正式发布时注释掉 drawDebug() 调用）
-const DEBUG = new URLSearchParams(window.location.search).has('debug');
-if (DEBUG) { const d = document.getElementById('debug'); if (d) d.style.display = ''; }
-
-let debugStatus = 'init';
-function drawDebug() {
-  const el = document.getElementById('debug');
-  if (!el) return;
-  el.innerHTML = [
-    'status: ' + debugStatus + '  seq:' + sequenceProgress + '/3',
-    'fingers: ' + currentFingerCount + '  rel:' + (needRelease ? '1' : '0'),
-    'detail: ' + fingerDetail,
-    'f:' + frameCount + ' r:' + resultCount + ' h:' + handCount + ' lh:' + lastHandFrame,
-    'stable: ' + (gestureStableMs / 1000).toFixed(1) + 's',
-  ].join('<br>');
-}
 
 // 先启动渲染循环（显示加载动画）
 requestAnimationFrame(loop);
